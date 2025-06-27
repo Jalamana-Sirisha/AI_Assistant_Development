@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #f1f1f1;
+        }
+        .chat {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+            max-width: 600px;
+            margin: auto;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            background-color: #ffffff;
+        }
+        .chat-header {
+            padding: 15px;
+            background-color: #007bff;
+            color: white;
+            text-align: center;
+        }
+        .chat-body {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-message {
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 5px;
+            width: fit-content;
+            max-width: 80%;
+        }
+        .chat-message.user {
+            background-color: #007bff;
+            color: white;
+            align-self: flex-end;
+        }
+        .chat-message.bot {
+            background-color: #e2e3e5;
+            color: black;
+            align-self: flex-start;
+        }
+        .chat-footer {
+            padding: 15px;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-wrap: wrap; /* Allows items to wrap to the next line */
+            align-items: center;
+            border-top: 1px solid #dee2e6;
+            /* New: Align items to the end of the main axis when wrapped */
+            justify-content: flex-end;
+        }
+        .chat-footer select, .chat-footer input {
+            flex-grow: 1;
+            margin-right: 10px;
+            margin-bottom: 10px; /* Space between input/select and button */
+        }
+        .chat-footer button {
+            margin-bottom: 10px; /* Space for the send button */
+        }
+        .feedback-section {
+            margin-top: 5px;
+            font-size: 0.9em;
+            color: #555;
+            display: flex;
+            align-items: center;
+        }
+        .feedback-section button {
+            margin-left: 5px;
+            padding: 2px 8px;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat">
+        <div class="chat-header">
+            Sirisha's AI Assistant
+        </div>
+        <div class="chat-body" id="chat-body"></div>
+        <div class="chat-footer">
+            <select class="form-select mb-2" id="function-selector">
+                <option value="Youtube" selected>Ask a Question</option>
+                <option value="summarize_text">Summarize Text</option>
+                <option value="creative_content">Generate Creative Content</option>
+                <option value="provide_advice">Get Advice</option>
+            </select>
+            <input type="text" class="form-control" id="message-input" placeholder="Type your query...">
+            <button class="btn btn-primary" id="send-button">Send</button>
+        </div>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+
+    <script>
+        $(document).ready(function() {
+            let lastUserMessage = "";
+            let lastBotResponse = "";
+
+            function sendMessage() {
+                var userMessage = $('#message-input').val().trim();
+                var functionType = $('#function-selector').val();
+
+                if (userMessage) {
+                    // Store for feedback
+                    lastUserMessage = userMessage;
+
+                    // Append user message to chat body
+                    $('#chat-body').append('<div class="chat-message user">' + userMessage + '</div>');
+                    // Clear input field
+                    $('#message-input').val("");
+                    // Scroll to the bottom of the chat
+                    $('#chat-body').scrollTop($('#chat-body')[0].scrollHeight);
+
+                    // Send message to Flask backend
+                    $.ajax({
+                        url: '/chat',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({ 
+                            "message": userMessage,
+                            "function_type": functionType 
+                        }),
+                        success: function(response) {
+                            var botResponse = response.response;
+                            lastBotResponse = botResponse; // Store for feedback
+                            
+                            // Append bot message to chat body
+                            var botMessageDiv = $('<div class="chat-message bot"></div>').text(botResponse);
+                            $('#chat-body').append(botMessageDiv);
+
+                            // Add feedback buttons 
+                            var feedbackSection = $('<div class="feedback-section">Was this helpful? ' +
+                                '<button class="btn btn-sm btn-outline-success feedback-btn" data-feedback="yes">Yes</button>' +
+                                '<button class="btn btn-sm btn-outline-danger feedback-btn" data-feedback="no">No</button>' +
+                                '</div>');
+                            botMessageDiv.append(feedbackSection);
+
+                            // Attach click handlers to feedback buttons
+                            feedbackSection.find('.feedback-btn').on('click', function() {
+                                var feedback = $(this).data('feedback');
+                                sendFeedback(feedback, lastUserMessage, lastBotResponse);
+                                // Disable buttons after feedback
+                                $(this).parent().html('Thanks for your feedback!');
+                            });
+
+                            // Scroll to the bottom of the chat after bot response
+                            $('#chat-body').scrollTop($('#chat-body')[0].scrollHeight);
+                        },
+                        error: function(xhr, status, error) {
+                            console.error("Error communicating with backend:", error);
+                            $('#chat-body').append('<div class="chat-message bot" style="background-color: #dc3545; color: white;">Error: Could not get response.</div>');
+                            $('#chat-body').scrollTop($('#chat-body')[0].scrollHeight);
+                        }
+                    });
+                }
+            }
+
+            function sendFeedback(feedback, userMsg, botResp) {
+                $.ajax({
+                    url: '/feedback',
+                    type: 'POST',
+                    contentType: 'application/json',
+                    data: JSON.stringify({
+                        "feedback": feedback,
+                        "user_message": userMsg,
+                        "bot_response": botResp
+                    }),
+                    success: function(response) {
+                        console.log("Feedback sent:", response.status);
+                    },
+                    error: function(xhr, status, error) {
+                        console.error("Error sending feedback:", error);
+                    }
+                });
+            }
+
+            // Event listener for send button click
+            $('#send-button').click(function() {
+                sendMessage();
+            });
+
+            // Event listener for Enter key press on message input
+            $('#message-input').keypress(function(e) {
+                if (e.which == 13) { // 13 is the keycode for Enter
+                    sendMessage();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
