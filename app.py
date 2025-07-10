@@ -2,7 +2,6 @@ from flask import Flask, render_template, request, jsonify
 import google.generativeai as genai
 import os
 
-
 GOOGLE_API_KEY = "AIzaSyCa-YnjBmkSKJywMhyduIOujIck7IK3MKs" 
 
 if not GOOGLE_API_KEY:
